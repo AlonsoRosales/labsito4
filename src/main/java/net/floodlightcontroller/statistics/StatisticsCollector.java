@@ -12,18 +12,15 @@ import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.projectfloodlight.openflow.protocol.OFPortStatsEntry;
-import org.projectfloodlight.openflow.protocol.OFPortStatsReply;
-import org.projectfloodlight.openflow.protocol.OFStatsReply;
-import org.projectfloodlight.openflow.protocol.OFStatsRequest;
-import org.projectfloodlight.openflow.protocol.OFStatsType;
-import org.projectfloodlight.openflow.protocol.OFVersion;
+import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.ver13.OFMeterSerializerVer13;
+import org.projectfloodlight.openflow.protocol.OFVersion;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.OFPort;
 import org.projectfloodlight.openflow.types.TableId;
 import org.projectfloodlight.openflow.types.U64;
+import org.sdnplatform.sync.internal.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +55,14 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	
 	private static final String INTERVAL_PORT_STATS_STR = "collectionIntervalPortStatsSeconds";
 	private static final String ENABLED_STR = "enable";
+
+	private static final String TxThreshold = "PortTxThreshold";
+	private static final String RxThreshold = "PortRxThreshold";
+	private static  int TXTH = 5;
+	private static int RXTH = 5;
+
+
+	private static final HashMap<Pair<Match,DatapathId>, FlowRuleStats> flowStats = new HashMap<>();
 
 	private static final HashMap<NodePortTuple, SwitchPortBandwidth> portStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
 	private static final HashMap<NodePortTuple, SwitchPortBandwidth> tentativePortStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
@@ -126,10 +131,52 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 									U64.ofRaw((txBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec), 
 									pse.getRxBytes(), pse.getTxBytes())
 									);
+
+							boolean superoTX = TXTH < ((txBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec);
+							boolean superoRX = RXTH < ((rxBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec);
+
+							if(superoTX && !superoRX){
+								log.info("SE HA SUPERADO EL VALOR UMBRAL DE TX");
+							}else{
+								if(!superoTX && superoRX){
+									log.info("SE HA SUPERADO EL VALOR UMBRAL DE RX");
+								}else{
+									if(superoTX && superoRX){
+										log.info("SE HA SUPERADO LOS UMBRALES DE TX Y RX");
+									}
+								}
+							}
+
 							
 						} else { /* initialize */
 							tentativePortStats.put(npt, SwitchPortBandwidth.of(npt.getNodeId(), npt.getPortId(), U64.ZERO, U64.ZERO, pse.getRxBytes(), pse.getTxBytes()));
 						}
+					}
+				}
+			}
+		}
+	}
+
+
+	protected class FlowStatsCollector implements Runnable {
+		@Override
+		public void run() {
+			flowStats.clear(); // to clear expired flows
+			Map<DatapathId, List<OFStatsReply>> replies = getSwitchStatistics(switchService.getAllSwitchDpids(), OFStatsType.FLOW);
+			for (Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
+				IOFSwitch sw = switchService.getSwitch(e.getKey());
+				for (OFStatsReply r : e.getValue()) {
+					OFFlowStatsReply psr = (OFFlowStatsReply) r;
+					for (OFFlowStatsEntry pse : psr.getEntries()) {
+						Pair<Match, DatapathId> pair = new Pair<>(pse.getMatch(), e.getKey());
+						flowStats.put(pair,FlowRuleStats.of(
+								e.getKey(),
+								pse.getByteCount(),
+								pse.getPacketCount(),
+								pse.getPriority(),
+								pse.getHardTimeout(),
+								pse.getIdleTimeout(),
+								pse.getDurationSec()));
 					}
 				}
 			}
@@ -215,6 +262,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 		}
 		log.info("Statistics collection {}", isEnabled ? "enabled" : "disabled");
 
+
 		if (config.containsKey(INTERVAL_PORT_STATS_STR)) {
 			try {
 				portStatsInterval = Integer.parseInt(config.get(INTERVAL_PORT_STATS_STR).trim());
@@ -223,6 +271,25 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 			}
 		}
 		log.info("Port statistics collection interval set to {}s", portStatsInterval);
+
+		if (config.containsKey(TxThreshold)) {
+			try {
+				TXTH = Integer.parseInt(config.get(TxThreshold));
+			} catch (Exception e) {
+				log.error("Could not parse '{}'. Using default of {}", TxThreshold, TXTH);
+			}
+		}
+		log.info("Port tx threshold is set to {}", TXTH);
+
+		if (config.containsKey(RxThreshold)) {
+			try {
+				RXTH = Integer.parseInt(config.get(RxThreshold));
+			} catch (Exception e) {
+				log.error("Could not parse '{}'. Using default of {}", RxThreshold, RXTH);
+			}
+		}
+		log.info("Port rx threshold is set to {}", RXTH);
+
 	}
 
 	@Override

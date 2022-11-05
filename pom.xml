@@ -224,7 +224,13 @@
 			<artifactId>jackson-dataformat-cbor</artifactId>
 			<version>${lib-jackson-version}</version>
 		</dependency>
-	</dependencies>
+        <dependency>
+            <groupId>com.dorkbox</groupId>
+            <artifactId>Version</artifactId>
+            <version>2.4</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
 	<properties>
 		<lib-restlet-version>2.3.2</lib-restlet-version>
 		<lib-jackson-version>2.4.4</lib-jackson-version>
