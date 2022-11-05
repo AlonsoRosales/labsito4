@@ -32,8 +32,7 @@ public class MACTracker implements IOFMessageListener, IFloodlightModule,IMACTra
 
 	@Override
 	public String getName() {
-		return MACTracker.class.getSimpleName();
-		//return "MACTracker";
+		return "MACTracker";
 	}
 
 	@Override
