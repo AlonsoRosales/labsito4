@@ -100,6 +100,7 @@ public class MACTracker implements IOFMessageListener, IFloodlightModule,IMACTra
 							sw.getId().toString());
 
 					buffer.add(new SwitchMACMessagePair(sw,msg,sourceMACHash));
+					logger.info("AÑADI CON EXITO");
 				}
 
 				break;

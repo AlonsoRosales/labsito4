@@ -11,7 +11,7 @@ public class MACTrackerRoutable implements RestletRoutable {
     @Override
     public Restlet getRestlet(Context context) {
         Router router = new Router(context);
-        router.attach("/tracker/json",MACTrackerResource.class);
+        router.attach("/history/json",MACTrackerResource.class);
         return  router;
     }
 

@@ -21,16 +21,19 @@ public class SwitchMACMessagePairSerializer extends JsonSerializer<SwitchMACMess
         jGen.writeStartObject();
         jGen.writeStringField("dpid", m.getSwitch().getId().toString());
         jGen.writeEndObject();
+        System.out.println(m.getSwitch().getId().toString());
 
         jGen.writeFieldName("MAC");
         jGen.writeStartObject();
         jGen.writeStringField("mac",m.getMac().toString());
         jGen.writeEndObject();
+        System.out.println(m.getMac().toString());
 
         jGen.writeFieldName("message");
         jGen.writeStartObject();
         jGen.writeStringField("type", m.getMessage().getType().toString());
         jGen.writeEndObject();
+        System.out.println(m.getMessage().getType().toString());
 
         jGen.writeEndObject();
     }
